@@ -112,10 +112,31 @@ def allocation():
             if x[(i,j)].value() == 1:
                 print(f"设备{i} → 企业{j}")
     
-    
 
+# 非线性规划 -> 使用scipy的minimize函数
+def non_Lp():
+    
+    # 1. 定义目标函数
+    def objective_function(x :list):
+        # ... = 0 这种形式的最小值
+        return x[0] ** 2 + x[1] ** 2 + x[2] ** 2 + 8
+    
+    x0 = [0, 0 ,0] #? 初始化猜测值
+    
+    # 定义约束条件 constraints
+    # constants 是一个套着字典的元祖，每一个字典代表一个不等式或者等式
+    constants = ({'type': 'ineq', 'fun': lambda x: x[0] - 2 * x[1] + 2}, # ineq -> ... >= 0
+                 {'type': 'ineq', 'fun': lambda x: -x[0] - 2 * x[1] + 6},
+                 {'type': 'ineq', 'fun': lambda x: -x[0] + 2 * x[1] + 2})
+
+    res = minimize(objective_function, x0, constraints=constants)
+    
+    # 打印结果
+    print('最小值', res.fun)
+    print(f'最优解{res.x}')
 
 
 if __name__ == '__main__':
     # School()
-    allocation()
+    #allocation()
+    non_Lp()
