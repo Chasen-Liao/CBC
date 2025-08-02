@@ -4,13 +4,6 @@ from scipy.stats import PermutationMethod
 
 
 # 构造列联表数据
-# 假设我们想研究"是否逾期"与"性别"之间是否相关
-# 行：性别 (Male / Female)
-# 列：是否逾期 (Overdue / NotOverdue)
-# contingency_table = np.array([
-#     [30, 70],  # 男性: 逾期=30, 未逾期=70
-#     [20, 80]   # 女性: 逾期=20, 未逾期=80
-# ])
 
 # 研究"表面风化"和"纹路"之间是否相关
 '''
