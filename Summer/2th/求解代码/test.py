@@ -103,7 +103,7 @@ def solve_problem1():
     
     # 迭代求解吃水深度（考虑风力对浮标的影响）
     H_w = total_weight / buoyancy_coeff  # 初始吃水深度
-    for _ in range(1000):  # 迭代1000次
+    for _ in range(10000):  # 迭代10000次
         # 更新风力（考虑实际吃水深度）
         F = 0.625 * 2 * (2 - H_w) * v**2
         
@@ -158,29 +158,77 @@ def solve_problem1():
 # 5. 问题2求解函数
 # =====================
 def solve_problem2():
+    
+    #TODO 这里求解是有问题的
+    
     """
     求解问题2：风速36m/s时的系泊系统状态，调整重物球质量使钢桶倾角<5°
     
     返回:
-        所需重物球质量, 钢桶倾斜角度等
+        所需重物球质量, 钢桶倾斜角度
     """
     v_high = 36.0  # 高风速
     m_ball = 1200.0  # 初始重物球质量
+    max_iter = 20    # 最大迭代次数
+    tolerance = 0.1  # 倾角收敛容差
+    bucket_angle = 10.0  # 初始倾角估计值（大于5°）
     
-    # 尝试增加重物球质量直到倾角<5°
-    for i in range(10):
+    # 迭代增加重物球质量直到倾角<5°
+    for i in range(max_iter):
         # 计算当前重物球的水中有效重量
         w_ball_current = calculate_buoyant_weight(m_ball)
         
-        # 与问题1类似的求解过程（略去详细实现）
-        # ...
+        # =======================================================================
+        # 核心求解逻辑（基于问题1的模型，修改风速和重物球参数）
+        # =======================================================================
+        # 1. 计算当前风力（考虑吃水深度影响）
+        H_w = 1.0  # 初始吃水深度估计值
+        F = 0.625 * 2 * (2 - H_w) * v_high**2
         
-        # 假设计算得到的倾角
-        bucket_angle = 9.45 - i * 0.5  # 模拟收敛过程
+        # 2. 计算锚链段参数
+        a1 = F / w0
+        a2 = F / (w_bucket / 1.0)  
+        a3 = F / (w_pipe / 1.0)    
         
-        if bucket_angle < 5.0:
+        # 3. 计算总重量（包含当前重物球）
+        W_m0m = (L0 * w0) + w_ball_current
+        W_m0m_m1 = W_m0m + w_bucket
+        
+        # 4. 计算关键角度
+        theta1 = np.arctan(W_m0m / F)  # 钢桶下端角度
+        theta2 = np.arctan(W_m0m_m1 / F)  # 钢管下端角度
+        
+        # 5. 定义并求解方程组（与问题1相同）
+        def equations(vars):
+            x0, x1, x5 = vars
+            y0 = catenary_equation(x0, a1)
+            y1 = catenary_equation(x1, a2, x0, y0, theta1)
+            y5 = catenary_equation(x5, a3, x1, y1, theta2)
+            
+            eq1 = y5 - (H_water - H_w)
+            eq2 = a2 * (np.sinh((x1 - x0)/a2 + np.log((1+np.sin(theta1))/np.cos(theta1)))) - \
+                   a2 * np.sinh(np.log((1+np.sin(theta1))/np.cos(theta1))) - 1.0
+            eq3 = a3 * (np.sinh((x5 - x1)/a3 + np.log((1+np.sin(theta2))/np.cos(theta2)))) - \
+                   a3 * np.sinh(np.log((1+np.sin(theta2))/np.cos(theta2))) - 4.0
+            return [eq1, eq2, eq3]
+        
+        # 6. 求解方程组并获取钢桶倾角
+        x0, x1, x5 = fsolve(equations, [15.0, 15.5, 16.0])
+        bucket_angle = np.degrees(theta1)  # 转换为角度
+        # =======================================================================
+        
+        # 检查收敛条件
+        if abs(bucket_angle - 5.0) < tolerance:
             break
-        m_ball += 200.0  # 增加重物球质量
+            
+        # 质量调整策略：倾角过大时增加重物球质量
+        if bucket_angle > 5.0:
+            # 基于倾角偏差动态调整质量增量
+            mass_increment = max(50, int((bucket_angle - 5.0) * 100))
+            m_ball += mass_increment
+        else:
+            # 若倾角过小（理论上不会发生），适当减小质量
+            m_ball = max(1200, m_ball - 50)
     
     return m_ball, bucket_angle
 
@@ -229,8 +277,9 @@ if __name__ == "__main__":
     H_w, drag_length, x5, bucket_angle = solve_problem1()
     print(f"浮标吃水深度: {H_w:.2f} m")
     print(f"锚链拖地长度: {drag_length:.2f} m")
-    print(f"浮标游动区域半径: {x5:.2f} m")
+    print(f"浮标游动区域半径: {x5 + drag_length:.2f} m")
     print(f"钢桶倾斜角度: {bucket_angle:.2f}°")
+    
     
     # 求解问题2
     print("\n>>> 求解问题2: 风速36m/s时所需重物球质量")
