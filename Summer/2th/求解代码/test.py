@@ -103,7 +103,7 @@ def solve_problem1():
     
     # 迭代求解吃水深度（考虑风力对浮标的影响）
     H_w = total_weight / buoyancy_coeff  # 初始吃水深度
-    for _ in range(10000):  # 迭代10000次
+    for _ in range(10):  # 迭代10000次
         # 更新风力（考虑实际吃水深度）
         F = 0.625 * 2 * (2 - H_w) * v**2
         
@@ -143,6 +143,7 @@ def solve_problem1():
         
         # 计算实际被拉起的锚链长度
         s_lifted = a1 * np.sinh(x0 / a1)
+        
         drag_length = L0 - s_lifted
         
         # 更新总重量（只考虑被拉起的锚链）
@@ -157,115 +158,185 @@ def solve_problem1():
 # =====================
 # 5. 问题2求解函数
 # =====================
-def solve_problem2():
+
+
+# TODO 这里还是不行，锚链末端角度求解有点出错
+
+
+import numpy as np
+from scipy.optimize import fsolve
+
+def solve_problem2_corrected():
+    # 物理参数（根据论文设定）
+    v_high = 36.0        # 高风速 (m/s)
+    H_water = 18.0       # 海水深度 (m)
+    L0 = 22.05           # 锚链总长度 (m)
+    w0 = 59.59           # 锚链单位水中重量 (N/m)
+    w_bucket = 269.96    # 钢桶水中重量 (N)
+    w_pipe = 85.12       # 钢管单位水中重量 (N/m)
     
-    #TODO 这里求解是有问题的
+    # 初始参数
+    m_ball = 1200.0      # 初始重物球质量 (kg)
+    max_iter = 20         # 最大迭代次数
+    tolerance = 0.1      # 收敛容差
     
-    """
-    求解问题2：风速36m/s时的系泊系统状态，调整重物球质量使钢桶倾角<5°
+    # 浮力修正计算（论文核心）
+    def calculate_buoyant_weight(mass):
+        density_steel = 7800  # 钢材密度 (kg/m³)
+        density_water = 1025  # 海水密度 (kg/m³)
+        g = 9.8               # 重力加速度 (m/s²)
+        volume = mass / density_steel
+        buoyancy = volume * density_water * g
+        return mass * g - buoyancy  # 水中有效重量
     
-    返回:
-        所需重物球质量, 钢桶倾斜角度
-    """
-    v_high = 36.0  # 高风速
-    m_ball = 1200.0  # 初始重物球质量
-    max_iter = 20    # 最大迭代次数
-    tolerance = 0.1  # 倾角收敛容差
-    bucket_angle = 10.0  # 初始倾角估计值（大于5°）
+    # 通用悬链线方程（论文公式3）
+    def generalized_catenary(x, a, x0_ref, y0_ref, theta0):
+        C = np.log((1 + np.sin(theta0)) / np.cos(theta0))
+        return a * np.cosh((x - x0_ref)/a + C) + y0_ref - a/np.cos(theta0)
     
-    # 迭代增加重物球质量直到倾角<5°
+    # 弧长计算函数（论文公式）
+    def calculate_arc_length(a, x_start, x_end, theta0):
+        C = np.log((1 + np.sin(theta0)) / np.cos(theta0))
+        return a * (np.sinh((x_end - x_start)/a + C) - np.sinh(C))
+    
+    # 迭代求解
     for i in range(max_iter):
-        # 计算当前重物球的水中有效重量
+        # 1. 计算当前重物球的有效重量
         w_ball_current = calculate_buoyant_weight(m_ball)
         
-        # =======================================================================
-        # 核心求解逻辑（基于问题1的模型，修改风速和重物球参数）
-        # =======================================================================
-        # 1. 计算当前风力（考虑吃水深度影响）
-        H_w = 1.0  # 初始吃水深度估计值
-        F = 0.625 * 2 * (2 - H_w) * v_high**2
+        # 2. 计算风力（考虑吃水深度影响）
+        H_w = 0.7  # 初始吃水深度估计
+        F_wind = 0.625 * 2 * (2 - H_w) * v_high**2
         
-        # 2. 计算锚链段参数
-        a1 = F / w0
-        a2 = F / (w_bucket / 1.0)  
-        a3 = F / (w_pipe / 1.0)    
+        # 3. 计算悬链线参数
+        a1 = F_wind / w0
+        a2 = F_wind / (w_bucket/1.0)  # 钢桶段参数（长度1m）
+        a3 = F_wind / w_pipe
         
-        # 3. 计算总重量（包含当前重物球）
+        # 4. 计算总重量
         W_m0m = (L0 * w0) + w_ball_current
         W_m0m_m1 = W_m0m + w_bucket
         
-        # 4. 计算关键角度
-        theta1 = np.arctan(W_m0m / F)  # 钢桶下端角度
-        theta2 = np.arctan(W_m0m_m1 / F)  # 钢管下端角度
+        # 5. 计算关键角度
+        theta1 = np.arctan(W_m0m / F_wind)   # 钢桶下端角度
+        theta2 = np.arctan(W_m0m_m1 / F_wind) # 钢管下端角度
         
-        # 5. 定义并求解方程组（与问题1相同）
+        # 6. 定义并求解方程组（关键修正）
         def equations(vars):
-            x0, x1, x5 = vars
-            y0 = catenary_equation(x0, a1)
-            y1 = catenary_equation(x1, a2, x0, y0, theta1)
-            y5 = catenary_equation(x5, a3, x1, y1, theta2)
+            x0, x1, x5 = vars[:3]
+            theta0 = np.radians(16.0) if len(vars) == 3 else vars[3]  # 锚链角度修正
             
-            eq1 = y5 - (H_water - H_w)
-            eq2 = a2 * (np.sinh((x1 - x0)/a2 + np.log((1+np.sin(theta1))/np.cos(theta1)))) - \
-                   a2 * np.sinh(np.log((1+np.sin(theta1))/np.cos(theta1))) - 1.0
-            eq3 = a3 * (np.sinh((x5 - x1)/a3 + np.log((1+np.sin(theta2))/np.cos(theta2)))) - \
-                   a3 * np.sinh(np.log((1+np.sin(theta2))/np.cos(theta2))) - 4.0
+            # 锚链段（从锚点x=0到x0）
+            y0 = generalized_catenary(x0, a1, 0, 0, theta0)
+            
+            # 钢桶段（从x0到x1，长度1m）
+            y1 = generalized_catenary(x1, a2, x0, y0, theta1)
+            
+            # 钢管段（从x1到x5，长度4m）
+            y5 = generalized_catenary(x5, a3, x1, y1, theta2)
+            
+            # 约束条件
+            eq1 = y5 - (H_water - H_w)       # 浮标位置
+            eq2 = calculate_arc_length(a2, x0, x1, theta1) - 1.0  # 钢桶长度
+            eq3 = calculate_arc_length(a3, x1, x5, theta2) - 4.0  # 钢管长度
+            
+            # 仅当锚链完全拉起时应用长度约束
+            if len(vars) == 4:
+                eq4 = calculate_arc_length(a1, 0, x0, theta0) - L0  # 锚链长度
+                return [eq1, eq2, eq3, eq4]
             return [eq1, eq2, eq3]
         
-        # 6. 求解方程组并获取钢桶倾角
-        x0, x1, x5 = fsolve(equations, [15.0, 15.5, 16.0])
-        bucket_angle = np.degrees(theta1)  # 转换为角度
-        # =======================================================================
-        
-        # 检查收敛条件
-        if abs(bucket_angle - 5.0) < tolerance:
-            break
+        try:
+            # 尝试两种状态：锚链可能拖地或完全拉起
+            try:
+                # 状态1：锚链完全拉起（4变量）
+                solution = fsolve(equations, [8.0, 11.5, 12.0, np.radians(20)], xtol=1e-3)
+                x0, x1, x5, theta0_rad = solution
+                anchor_angle = np.degrees(theta0_rad)
+                # print(anchor_angle)
+            except:
+                # 状态2：锚链部分拖地（3变量）
+                solution = fsolve(equations, [2.0, 3.0, 4.0], xtol=1e-3)
+                x0, x1, x5 = solution
+                anchor_angle = 0.0  # 拖地时角度为0
+                
+            # 计算钢桶倾角
+            bucket_angle = 90.0 - np.degrees(theta1)
             
-        # 质量调整策略：倾角过大时增加重物球质量
-        if bucket_angle > 5.0:
-            # 基于倾角偏差动态调整质量增量
-            mass_increment = max(50, int((bucket_angle - 5.0) * 100))
+        except Exception as e:
+            print(f"求解失败: {e}")
+            anchor_angle = 25.0
+            bucket_angle = 10.0
+        
+        # 打印当前状态
+        print(f"Iter {i}: m_ball={m_ball:.1f}kg, 锚链角={anchor_angle:.2f}°, 钢桶角={bucket_angle:.2f}°")
+        
+        # 质量调整策略（论文方法）
+        if anchor_angle > 16.0:
+            # 根据偏差动态调整
+            mass_increment = max(50, (anchor_angle - 16.0) * 100)
             m_ball += mass_increment
         else:
-            # 若倾角过小（理论上不会发生），适当减小质量
-            m_ball = max(1200, m_ball - 50)
+            print(f"满足条件：锚链角={anchor_angle:.2f}° ≤ 16°")
+            break
     
-    return m_ball, bucket_angle
+    return m_ball, bucket_angle, anchor_angle
+
 
 # =====================
 # 6. 可视化函数
 # =====================
-def plot_catenary(x0, x1, x5, a1, a2, a3, theta1, theta2):
+def plot_catenary(x0, x1, x5, a1, a2, a3, theta1, theta2, drag_length):
     """
-    绘制三段悬链线形状
+    修正：包含锚链拖地部分的可视化
     
-    参数:
-        x0, x1, x5: 连接点x坐标
-        a1, a2, a3: 三段悬链线参数
-        theta1, theta2: 连接点角度
+    参数新增:
+        drag_length: 锚链拖地长度
     """
-    # 创建x坐标点
+    # 计算锚点实际位置（拖地段起点）
+    anchor_x = drag_length
+    anchor_y = 0
+    
+    # 创建x坐标点 (从拖地段起点开始)
+    x_drag = np.linspace(-drag_length, 0, 30)  # 新增：拖地段
     x_chain = np.linspace(0, x0, 50)
     x_bucket = np.linspace(x0, x1, 20)
     x_pipe = np.linspace(x1, x5, 30)
     
     # 计算y坐标
+    y_drag = np.zeros_like(x_drag)  # 拖地段平铺海底
     y_chain = catenary_equation(x_chain, a1)
+    
+    # 连接点高度修正
     y0 = catenary_equation(x0, a1)
     y_bucket = catenary_equation(x_bucket, a2, x0, y0, theta1)
     y1 = catenary_equation(x1, a2, x0, y0, theta1)
     y_pipe = catenary_equation(x_pipe, a3, x1, y1, theta2)
     
-    # 绘图
-    plt.figure(figsize=(10, 6))
-    plt.plot(x_chain, y_chain, 'b-', label='锚链段')
-    plt.plot(x_bucket, y_bucket, 'r-', label='钢桶段')
-    plt.plot(x_pipe, y_pipe, 'g-', label='钢管段')
+    # 绘图 (新增拖地段)
+    plt.figure(figsize=(12, 7))
+    plt.plot(x_drag + anchor_x, y_drag, 'k--', label=f'锚链拖地段({drag_length:.1f}m)')  # 虚线表示海底
+    plt.plot(x_chain + anchor_x, y_chain, 'b-', label='悬链段')
+    plt.plot(x_bucket + anchor_x, y_bucket, 'r-', label='钢桶段')
+    plt.plot(x_pipe + anchor_x, y_pipe, 'g-', label='钢管段')
+    
+    # 标记关键点
+    plt.scatter([anchor_x], [0], c='k', marker='*', s=100, label='锚点')
+    plt.scatter([x0 + anchor_x], [y0], c='purple', s=80, label='锚链-钢桶连接点')
+    
     plt.xlabel('水平距离 (m)')
     plt.ylabel('高度 (m)')
-    plt.title('系泊系统悬链线形状')
-    plt.legend()
+    plt.title('系泊系统完整构型 (含锚链拖地)')
+    plt.legend(loc='upper right')
     plt.grid(True)
+    plt.axis('equal')  # 保持纵横比
+    
+    # 添加海底基准线
+    plt.axhline(y=0, color='gray', linestyle='-', alpha=0.5)
+    plt.text((x5 - drag_length)/2, -0.3, '海床', ha='center')
+    # 添加海平面
+    plt.axhline(y=18, color='gray', linestyle='-', alpha=0.5)
+    plt.text(0, 17.5, '海平面', ha='center')
     plt.show()
 
 # =====================
@@ -278,14 +349,14 @@ if __name__ == "__main__":
     print(f"浮标吃水深度: {H_w:.2f} m")
     print(f"锚链拖地长度: {drag_length:.2f} m")
     print(f"浮标游动区域半径: {x5 + drag_length:.2f} m")
-    print(f"钢桶倾斜角度: {bucket_angle:.2f}°")
+    print(f"钢桶竖直倾斜角度: {90.0 - bucket_angle:.2f}°")
     
     
     # 求解问题2
-    print("\n>>> 求解问题2: 风速36m/s时所需重物球质量")
-    m_ball_required, final_angle = solve_problem2()
-    print(f"所需重物球质量: {m_ball_required:.2f} kg")
-    print(f"调整后钢桶倾斜角度: {final_angle:.2f}°")
+    print("\n>>> 求解问题2")
+    optimal_mass, bucket_angle, anchor_angle = solve_problem2_corrected()
+    print(f"\n最终结果：重物球质量 = {optimal_mass:.2f}kg")
+    print(f"钢桶倾角 = {bucket_angle:.2f}°，锚链夹角 = {anchor_angle:.2f}°")
     
     # 可视化
     print("\n>>> 生成系泊系统示意图...")
@@ -296,4 +367,4 @@ if __name__ == "__main__":
     a3 = F / (w_pipe / 1.0)
     W_m0m = (L0 - drag_length) * w0 + w_ball
     theta1 = np.arctan(W_m0m / F)
-    plot_catenary(8.26, 8.28, 8.35, a1, a2, a3, theta1, theta1)
+    plot_catenary(8.26, 8.28, 8.35, a1, a2, a3, theta1, theta1, drag_length)
