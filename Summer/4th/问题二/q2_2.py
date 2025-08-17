@@ -167,7 +167,7 @@ def run_24_week_simulation():
         
         while True:
             random_num = np.random.normal(loc=1.00, scale=1.33, size=1)[0]
-            if abs(random_num - 1.00) <= 1.33 and random_num >= 0 and random_num <= 1.5:  # 检查是否在 μ±1.0 内
+            if abs(random_num - 1.00) <= 1.33 and random_num >= 0.0011 and random_num <= 1.5:  # 检查是否在 μ±1.0 内
                 break
         
         lost_rate = random_num / 100
