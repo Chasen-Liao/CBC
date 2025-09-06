@@ -187,6 +187,7 @@ t=0
 t_0=0
 while True:
     #计算龙头位置
+    #? 只要龙头进入问题三的掉头空间就进行掉头
     theta_now=theta(t)
     r_now=b*theta_now/(2*pi)
     if(r_now<=4.5):

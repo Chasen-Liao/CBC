@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 #参数
 n=224
-b=0.55
+b=1.7
 pi=np.pi
 t_max=301
 v_h=1
@@ -38,15 +38,16 @@ for t in range(t_max+1):
     head_y.append(y)
 
 #牛顿法解方程,求解各点的位置
-def f(theta_now,theta_next,d):
+def f(theta_now,theta_next,d): # 目标函数
     return (b*b/4/pi/pi)*(theta_now**2+theta_next**2-2*theta_now*theta_next*np.cos(theta_now-theta_next))-d**2
-def f_prime(theta_now,theta_next,d):
+def f_prime(theta_now,theta_next,d): # 目标函数求导
     return (b*b/4/pi/pi)*(2*theta_next+2*theta_now*(np.cos(theta_now-theta_next)-theta_next*np.sin(theta_now-theta_next)))
 
 def newton_method(f,f_prime,d,theta_now,x0,tol=1e-6,max_iter=100):
+    # 牛顿迭代法
     for i in range(max_iter):
         x = x0 - f(theta_now,x0,d) / f_prime(theta_now,x0,d)
-        if abs(x - x0) < tol:
+        if abs(x - x0) < tol: # 当迭代值和上一次迭代值差值小于收敛值时跳出
             break
         x0 = x
     return x

@@ -1,0 +1,95 @@
+import numpy as np
+import math
+
+def create_P_i(波长列表, lambda_1, m):
+    """ 求P列表
+    波长列表 单位 注意是nm
+    lambda_1是参考波长nm
+    m -- 级数差
+    """
+    P_list = []
+    for lambda_i in 波长列表:
+        P_i = m * lambda_1 / (lambda_1 - lambda_i) + 0.5
+        print(lambda_1)
+        print(lambda_i)
+        print(P_i)
+        P_list.append(P_i)
+        m += 1
+    return P_list
+
+def create_epi_thickness_10(P_list, 波长列表, incident_angle=10.0):
+    """
+    P_list极值级数列表
+    波长列表 nm
+    incident_angle -- 入射角度
+    """
+
+    折射率 = 2.55  # 碳化硅折射率
+    
+    # 计算相关参数
+    theta_rad = math.radians(incident_angle) # 入射角
+    sin_theta = math.sin(theta_rad) # 换成sin
+    de = math.sqrt(折射率**2 - sin_theta**2)
+    
+    # 厚度计算
+    # 把各个波数下的厚度都算出来然后求平均
+    res = []
+    for P, wavelen in zip(P_list, 波长列表):
+        T_i = (P - 0.5) * (0.001 * wavelen) / (2*de)  # 0.001是nm→μm转换, 因为T是毫米的
+        res.append(T_i)
+    
+    return res
+
+def create_epi_thickness_15(P_list, 波长列表, incident_angle=15.0):
+    """
+    附件2
+    """
+
+    折射率 = 2.55  # 碳化硅折射率
+    
+    # 计算相关参数
+    theta_rad = math.radians(incident_angle) # 入射角
+    sin_theta = math.sin(theta_rad) # 换成sin
+    de = math.sqrt(折射率**2 - sin_theta**2)
+    
+    # 厚度计算
+    # 把各个波数下的厚度都算出来然后求平均
+    res = []
+    for P, wavelen in zip(P_list, 波长列表):
+        T_i = (P - 0.5) * (0.001 * wavelen) / (2*de) 
+        res.append(T_i)
+    
+    return res
+
+# 示例使用
+if __name__ == "__main__":
+    # 您的波数数据 (单位: cm⁻¹)
+    wavenumbers = [518 ,636.27, 702.81, 821.72] # 波数列表
+    # wavenumbers = reversed(wavenumbers)
+    # 将波数转换为波长 (单位: nm): λ = 10^7 / wavenumber
+    wavelengths = [10**7 / w for w in wavenumbers]
+    lambda_1 = 10**7 / 401 # 取第一个出现的峰值下的波数作为参考值
+    
+    m = 0  # 
+    
+    # 计算 P_i
+    try:
+        P_list = create_P_i(wavelengths, lambda_1, m)
+        print("计算出的级数 P_i:", P_list)
+    except ValueError as e:
+        print("错误:", e)
+        # 如果失败，回退到直接计数（如[1,2,3]）
+        P_list = [1, 2, 3]
+        print("使用默认 P_list:", P_list)
+    
+    # 计算厚度
+    thicknesses = create_epi_thickness_10(P_list, wavelengths)
+    print("10度：")
+    print("厚度结果:", thicknesses)
+    print("平均:", np.mean(thicknesses))
+    print("标准差:", np.std(thicknesses))
+    thicknesses = create_epi_thickness_15(P_list, wavelengths)
+    print("15度:")
+    print("厚度结果:", thicknesses)
+    print("平均:", np.mean(thicknesses))
+    print("标准差:", np.std(thicknesses))
