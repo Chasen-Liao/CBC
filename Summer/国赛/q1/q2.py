@@ -10,17 +10,17 @@ def n_i(x):
     # 传入波长计算，当前类型的外延层折射率
     x = x / 1000
     # 碳化硅外延层波长-折射率
-    # n_i = (1+0.20075/(1+12.07224/x**2)+5.54861/(1-0.02641/x**2)+35.65066/(1-1268.24708/x**2))**0.5
+    n_i = (1+0.20075/(1+12.07224/x**2)+5.54861/(1-0.02641/x**2)+35.65066/(1-1268.24708/x**2))**0.5
     
     
-    n_i = 3.41 # 硅的折射率在温度为25的时候基本稳定在3.41    
+    # n_i = 3.41 # 硅的折射率在温度为25的时候基本稳定在3.41    
     return n_i
     
 def create_P_i(波长列表, lambda_1, m):
     """ 求P列表
     波长列表 单位 注意是nm
     lambda_1是参考波长nm
-    m -- 级数差（从传入的 m 开始递增）
+    m -- 级数差
     """
     P_list = []
     for lambda_i in 波长列表:
@@ -33,11 +33,10 @@ def create_P_i(波长列表, lambda_1, m):
     return P_list
 
 def create_epi_thickness_10(P_list, 波长列表, incident_angle=10.0):
-    """
+    """10
     P_list极值级数列表
     波长列表 nm
-    incident_angle -- 入射角度（度）
-    返回：每个波长对应的厚度列表（单位 μm）
+    返回：每个波长对应的厚度列表单位 μm
     """
     # 碳化硅折射率在不同波长的情况下不一样
     
@@ -57,9 +56,7 @@ def create_epi_thickness_10(P_list, 波长列表, incident_angle=10.0):
     return res
 
 def create_epi_thickness_15(P_list, 波长列表, incident_angle=15.0):
-    """
-    P_list 极值级数列表（用于 15° 情况）
-    波长列表 nm
+    """15
     返回：每个波长对应的厚度列表（单位 μm）
     """
     # 折射率 = 2.55  # 碳化硅折射率，从参考文献中获取的，之后可以代入一些常见的折射率
@@ -81,11 +78,11 @@ def create_epi_thickness_15(P_list, 波长列表, incident_angle=15.0):
     return res
 
 if __name__ == "__main__":
-    file_10 = "附件3.xlsx"   # 10度数据
-    file_15 = "附件4.xlsx"   # 15度数据
+    file_10 = "附件1.xlsx"   # 10度数据
+    file_15 = "附件2.xlsx"   # 15度数据
 
     # 平滑算法参数
-    sg_window = 17   # 窗口长度，必须为奇数，可根据数据点密度调整
+    sg_window = 33   # 窗口长度，必须为奇数，可根据数据点密度调整
     sg_poly = 3      # 多项式阶数
 
     # 峰值检测参数
@@ -97,7 +94,7 @@ if __name__ == "__main__":
     R10_raw = df10['reflectivity'].values
 
     # 转换为波长 nm
-    wavelens10 = (10**7) / k10   # nm
+    wavelens10 = (10**7) / k10   # nm 
 
     # 平滑处理
     R10_smooth = savgol_filter(R10_raw, sg_window, sg_poly)
@@ -108,8 +105,8 @@ if __name__ == "__main__":
     
     peak_wavelengths10 = wavelens10[peaks10]
     peak_wavenumbers10 = k10[peaks10]
-    print("附件1 (10°) 检测到的峰对应波长（nm）:", peak_wavelengths10.tolist())
-    print("附件1 (10°) 对应的波数（cm⁻¹）:", peak_wavenumbers10.tolist())
+    print("附件1检测到的峰对应波长:", peak_wavelengths10.tolist())
+    print("对应的波数:", peak_wavenumbers10.tolist())
 
     # 取第一个峰作为参考 lambda_1，剩下的波长用来计算 P
     lambda_1_10 = float(peak_wavelengths10[0])
@@ -124,7 +121,7 @@ if __name__ == "__main__":
 
     # 基于 P_list 计算厚度（调用你原函数）
     thicknesses10 = create_epi_thickness_10(P_list10, use_wavs10, incident_angle=10.0)
-    print("附件1（10°）厚度结果 (μm):", thicknesses10)
+    print("附件1厚度结果:", thicknesses10)
     print("平均:", np.nanmean(thicknesses10))
     print("标准差:", np.nanstd(thicknesses10))
 
@@ -191,4 +188,3 @@ if __name__ == "__main__":
 
     df_res = pd.DataFrame(results)
     df_res.to_excel("res/res.xlsx", index=False)
-    print("结果已写入 res.xlsx")
